@@ -79,8 +79,8 @@ func (nr *nodeReport) PrettyPrint() {
 	MaxMemRequestTitle := fmt.Sprintf("%s\t%s\t%s\t", "Max Memory request:", "Namespace:", "Pod name:")
 	MaxMemLimitTitle := fmt.Sprintf("%s\t%s\t%s\t", "Max Memory limit:", "Namespace:", "Pod name:")
 
-	SumCpuRequestReport := fmt.Sprintf("All requested CPU:\t %d\t", nr.SumCputRequests)
-	SumMemRequestReport := fmt.Sprintf("All requested MEMORY:\t %d\t", nr.SumMemRequests)
+	SummoryNodeResourcesTitle := fmt.Sprintf("%s\t%s\t%s\t%s\t", "All requested CPU:", "All requested MEMORY", "All CPU Limits:", "All MEMORY Limits")
+	SummoryNodeResourceReport := fmt.Sprintf("%d Core\t%d Core\t%d Gi\t%d Gi\t", nr.SumCputRequests, nr.SumCpuLimits, nr.SumMemRequests, nr.SumMemLimits)
 
 	NodeNameTitle := fmt.Sprintf("Node name: %s\n", nr.NodeName)
 	MaxCpuRequestReport := fmt.Sprintf("%d Cpu\t%s\t%s\t", nr.MaxCpuRequest.Value, nr.MaxCpuRequest.Namespace, nr.MaxCpuRequest.PodName)
@@ -105,8 +105,8 @@ func (nr *nodeReport) PrettyPrint() {
 	colorTitle.Fprintln(tw, MaxMemLimitTitle)
 	magColorLine.Fprintln(tw, MaxMemLimitReport)
 
-	magColorLine.Fprintln(tw, SumCpuRequestReport)
-	magColorLine.Fprintln(tw, SumMemRequestReport)
+	colorTitle.Fprintln(tw, SummoryNodeResourcesTitle)
+	magColorLine.Fprintln(tw, SummoryNodeResourceReport)
 
 	tw.Flush()
 
@@ -117,6 +117,10 @@ func (nr *nodeReport) ToHumanReadableVal() {
 	nr.MaxMemRequest.Value = BytesToGi(nr.MaxMemRequest.Value)
 	nr.MaxCpuLimit.Value = MilCoreToCore(nr.MaxCpuLimit.Value)
 	nr.MaxMemLimit.Value = BytesToGi(nr.MaxMemLimit.Value)
+	nr.SumCputRequests = MilCoreToCore(nr.SumCputRequests)
+	nr.SumCpuLimits = MilCoreToCore(nr.SumCpuLimits)
+	nr.SumMemRequests = BytesToGi(nr.SumMemRequests)
+	nr.SumMemLimits = BytesToGi(nr.SumMemLimits)
 }
 
 func (mrv *maxResourceVal) assignContext(obj *v1.ObjectMeta) {
