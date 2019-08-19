@@ -176,7 +176,7 @@ func MilCoreToCore(mc int64) int64 {
 }
 
 func BytesToGi(bts int64) int64 {
-	return bts / 1024 / 1024 / 1024 / 1024
+	return bts / 1024 / 1024 / 1024
 }
 
 func ClusterQuotaReport(clientset *kubernetes.Clientset) (*clusterQuotaReport, error) {
@@ -193,8 +193,8 @@ func ClusterQuotaReport(clientset *kubernetes.Clientset) (*clusterQuotaReport, e
 			memLimits := quota.Spec.Hard["limits.memory"]
 			clusterReport.SumCpuRequests += cpuRequests.MilliValue()
 			clusterReport.SumCpuLimits += cpuLimits.MilliValue()
-			clusterReport.SumMemRequests += memRequests.MilliValue()
-			clusterReport.SumMemLimits += memLimits.MilliValue()
+			clusterReport.SumMemRequests += memRequests.Value()
+			clusterReport.SumMemLimits += memLimits.Value()
 		}
 
 		return clusterReport, nil
@@ -215,8 +215,8 @@ func CreteNodeReport(clientset *kubernetes.Clientset, nodeName string) (nodeRepo
 		for _, container := range pod.Spec.Containers {
 			cpuRequest := container.Resources.Requests.Cpu().MilliValue()
 			cpuLimit := container.Resources.Limits.Cpu().MilliValue()
-			memRequest := container.Resources.Requests.Memory().MilliValue()
-			memLimit := container.Resources.Limits.Memory().MilliValue()
+			memRequest := container.Resources.Requests.Memory().Value()
+			memLimit := container.Resources.Limits.Memory().Value()
 			if cpuRequest > NodeReport.MaxCpuRequest.Value {
 				NodeReport.MaxCpuRequest.Value = cpuRequest
 				NodeReport.MaxCpuRequest.PodName = pod.Name
@@ -273,7 +273,6 @@ func main() {
 			log.Fatal(err)
 		}
 		nodeReport.PrettyPrint()
-
 	}
 	if clusterReport {
 		quotaReport, err := ClusterQuotaReport(client)
