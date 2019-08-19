@@ -219,7 +219,9 @@ func CreteNodeReport(clientset *kubernetes.Clientset, nodeName string) (nodeRepo
 		return nodeReport{}, err
 	}
 	allPods := append(podList.Items, pendingPodsList.Items...)
-
+	if len(allPods) == 0 {
+		log.Fatal("Empty Pods list!!")
+	}
 	NodeReport := nodeReport{}
 	NodeReport.NodeName = nodeName
 
