@@ -171,6 +171,13 @@ func RunningPodFromNodeOpt(nodeName string) v1.ListOptions {
 
 }
 
+func PendingPodFromNodeOpt(nodeName string) v1.ListOptions {
+	podState := "Pending"
+	fieldSelector := fmt.Sprintf("spec.nodeName=%s,status.phase=%s", nodeName, podState)
+	return v1.ListOptions{FieldSelector: fieldSelector}
+
+}
+
 func MilCoreToCore(mc int64) int64 {
 	return (mc / 1000)
 }
@@ -207,10 +214,16 @@ func CreteNodeReport(clientset *kubernetes.Clientset, nodeName string) (nodeRepo
 	if err != nil {
 		return nodeReport{}, err
 	}
+	pendingPodsList, err := clientset.CoreV1().Pods("").List(PendingPodFromNodeOpt(nodeName))
+	if err != nil {
+		return nodeReport{}, err
+	}
+	allPods := append(podList.Items, pendingPodsList.Items...)
+
 	NodeReport := nodeReport{}
 	NodeReport.NodeName = nodeName
 
-	for _, pod := range podList.Items {
+	for _, pod := range allPods {
 
 		for _, container := range pod.Spec.Containers {
 			cpuRequest := container.Resources.Requests.Cpu().MilliValue()
