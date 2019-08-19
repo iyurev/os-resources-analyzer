@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/fatih/color"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -80,7 +81,7 @@ func (nr *nodeReport) PrettyPrint() {
 	MaxMemLimitTitle := fmt.Sprintf("%s\t%s\t%s\t", "Max Memory limit:", "Namespace:", "Pod name:")
 
 	SummoryNodeResourcesTitle := fmt.Sprintf("%s\t%s\t%s\t%s\t", "All requested CPU:", "All requested MEMORY", "All CPU Limits:", "All MEMORY Limits")
-	SummoryNodeResourceReport := fmt.Sprintf("%d Core\t%d Core\t%d Gi\t%d Gi\t", nr.SumCputRequests, nr.SumCpuLimits, nr.SumMemRequests, nr.SumMemLimits)
+	SummoryNodeResourceReport := fmt.Sprintf("%d Core\t%d Gi\t%d Core\t%d Gi\t", nr.SumCputRequests, nr.SumMemRequests, nr.SumCpuLimits, nr.SumMemLimits)
 
 	NodeNameTitle := fmt.Sprintf("Node name: %s\n", nr.NodeName)
 	MaxCpuRequestReport := fmt.Sprintf("%d Cpu\t%s\t%s\t", nr.MaxCpuRequest.Value, nr.MaxCpuRequest.Namespace, nr.MaxCpuRequest.PodName)
@@ -88,27 +89,62 @@ func (nr *nodeReport) PrettyPrint() {
 	MaxMemRequestReport := fmt.Sprintf("%d Gi\t%s\t%s\t", nr.MaxMemRequest.Value, nr.MaxMemRequest.Namespace, nr.MaxMemRequest.PodName)
 	MaxMemLimitReport := fmt.Sprintf("%d Gi\t%s\t%s\t", nr.MaxMemLimit.Value, nr.MaxMemLimit.Namespace, nr.MaxMemLimit.PodName)
 
+	redTitle := color.New(color.FgRed, color.Bold)
+	yellowColorLine := color.New(color.FgYellow)
+
 	colorTitle := color.New(color.FgBlue, color.Bold)
 	magColorLine := color.New(color.FgMagenta, color.Bold)
 	greeColorLine := color.New(color.FgGreen, color.Bold)
-	greeColorLine.Fprintln(tw, NodeNameTitle)
+	_, err := greeColorLine.Fprintln(tw, NodeNameTitle)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = colorTitle.Fprintln(tw, MaxCpuRequestTitle)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = magColorLine.Fprintln(tw, MaxCpuRequestReport)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = colorTitle.Fprintln(tw, MaxCpuLimittTitle)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = magColorLine.Fprintln(tw, MaxCpuLimitReport)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	colorTitle.Fprintln(tw, MaxCpuRequestTitle)
-	magColorLine.Fprintln(tw, MaxCpuRequestReport)
+	_, err = colorTitle.Fprintln(tw, MaxMemRequestTitle)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = magColorLine.Fprintln(tw, MaxMemRequestReport)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = colorTitle.Fprintln(tw, MaxMemLimitTitle)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = magColorLine.Fprintln(tw, MaxMemLimitReport)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	colorTitle.Fprintln(tw, MaxCpuLimittTitle)
-	magColorLine.Fprintln(tw, MaxCpuLimitReport)
-
-	colorTitle.Fprintln(tw, MaxMemRequestTitle)
-	magColorLine.Fprintln(tw, MaxMemRequestReport)
-
-	colorTitle.Fprintln(tw, MaxMemLimitTitle)
-	magColorLine.Fprintln(tw, MaxMemLimitReport)
-
-	colorTitle.Fprintln(tw, SummoryNodeResourcesTitle)
-	magColorLine.Fprintln(tw, SummoryNodeResourceReport)
-
-	tw.Flush()
+	_, err = redTitle.Fprintln(tw, SummoryNodeResourcesTitle)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = yellowColorLine.Fprintln(tw, SummoryNodeResourceReport)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = tw.Flush()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 }
 
@@ -208,6 +244,15 @@ func CreteNodeReport(clientset *kubernetes.Clientset, nodeName string) (nodeRepo
 	return NodeReport, nil
 }
 
+var nodeName string
+var clusterReport bool
+
+func init() {
+	flag.StringVar(&nodeName, "node-name", "", "OpenShift node name.")
+	flag.BoolVar(&clusterReport, "cluster-report", false, "Get cluster resource report.")
+	flag.Parse()
+}
+
 func main() {
 
 	homePath := homedir.HomeDir()
@@ -221,26 +266,20 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	nodeReport, err := CreteNodeReport(client, "os-node-05")
-	if err != nil {
-		log.Fatal(err)
+
+	if nodeName != "" {
+		nodeReport, err := CreteNodeReport(client, nodeName)
+		if err != nil {
+			log.Fatal(err)
+		}
+		nodeReport.PrettyPrint()
+
 	}
-	nodeReport.PrettyPrint()
-	//quotaReport, err := ClusterQuotaReport(client)
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//quotaReport.PrettyPrint()
-
+	if clusterReport {
+		quotaReport, err := ClusterQuotaReport(client)
+		if err != nil {
+			log.Fatal(err)
+		}
+		quotaReport.PrettyPrint()
+	}
 }
-
-//fmt.Printf("Sum all CPU requests: %d\n", MilCoreToCore(sumCpuRequests))
-//fmt.Printf("Sum all CPU limits: %d\n", MilCoreToCore(sumCpuLimits))
-//fmt.Printf("Sum all MEMORY requests:  %d\n",  BytesToGi(sumMemRequests))
-//fmt.Printf("Sum all MEMORY limits:  %d\n", BytesToGi(sumMemLimits))
-//
-//fmt.Printf("Max CPU request is: %d\n", maxCpuRequest.Value)
-//fmt.Printf("Max CPU request is: %d\n", maxCpuLimit.Value)
-//
-//fmt.Printf("Max MEMORY request is: %d\n", BytesToGi(maxMemRequest.Value))
-//fmt.Printf("Max MEMORY limit is: %d, Namespace: %s, Pod name: %s\n", BytesToGi(MaxMemLimit.Value), MaxMemLimit.Namespace, MaxMemLimit.PodName)
