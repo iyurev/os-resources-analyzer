@@ -80,15 +80,17 @@ func (cqr *clusterQuotaReport) PrettyPrint() {
 }
 
 type nodeReport struct {
-	NodeName        string
-	MaxCpuRequest   maxResourceVal
-	MaxMemRequest   maxResourceVal
-	MaxCpuLimit     maxResourceVal
-	MaxMemLimit     maxResourceVal
-	SumCputRequests int64
-	SumMemRequests  int64
-	SumCpuLimits    int64
-	SumMemLimits    int64
+	NodeName         string
+	MaxCpuRequest    maxResourceVal
+	MaxMemRequest    maxResourceVal
+	MaxCpuLimit      maxResourceVal
+	MaxMemLimit      maxResourceVal
+	MaxCpuRatioLimit maxResourceVal
+	MaxMemRatioLimit maxResourceVal
+	SumCputRequests  int64
+	SumMemRequests   int64
+	SumCpuLimits     int64
+	SumMemLimits     int64
 }
 
 func (nr *nodeReport) PrettyPrint() {
@@ -253,7 +255,8 @@ func CreteNodeReport(clientset *kubernetes.Clientset, nodeName string) (nodeRepo
 	}
 	NodeReport := nodeReport{}
 	NodeReport.NodeName = nodeName
-
+	var cpuLimitRequestRatio int64
+	var memLimitRequestRatio int64
 	for _, pod := range allPods {
 
 		for _, container := range pod.Spec.Containers {
@@ -261,6 +264,25 @@ func CreteNodeReport(clientset *kubernetes.Clientset, nodeName string) (nodeRepo
 			cpuLimit := container.Resources.Limits.Cpu().MilliValue()
 			memRequest := container.Resources.Requests.Memory().Value()
 			memLimit := container.Resources.Limits.Memory().Value()
+
+			if cpuRequest != 0 {
+				cpuLimitRequestRatio = cpuLimit / cpuRequest
+			}
+			if memRequest != 0 {
+				memLimitRequestRatio = memLimit / memRequest
+			}
+
+			if cpuLimitRequestRatio > NodeReport.MaxCpuRatioLimit.Value {
+				NodeReport.MaxCpuRatioLimit.Value = cpuLimitRequestRatio
+				NodeReport.MaxCpuRatioLimit.PodName = pod.Name
+				NodeReport.MaxCpuRatioLimit.Namespace = pod.Namespace
+			}
+			if memLimitRequestRatio > NodeReport.MaxMemRatioLimit.Value {
+				NodeReport.MaxMemRatioLimit.Value = memLimitRequestRatio
+				NodeReport.MaxMemRatioLimit.PodName = pod.Name
+				NodeReport.MaxMemRatioLimit.Namespace = pod.Namespace
+			}
+
 			if cpuRequest > NodeReport.MaxCpuRequest.Value {
 				NodeReport.MaxCpuRequest.Value = cpuRequest
 				NodeReport.MaxCpuRequest.PodName = pod.Name
@@ -298,7 +320,6 @@ func init() {
 }
 
 func main() {
-
 	homePath := homedir.HomeDir()
 	kubeConfPath := filepath.Join(homePath, ".kube", defaultConfName)
 
