@@ -108,7 +108,7 @@ func (nr *nodeReport) PrettyPrint() {
 	maxCpuRatioTitle := fmt.Sprintf("%s\t%s\t%s\t", "Max CPU Ratio:", "Namespace:", "Pod name:")
 	maxCpuRatioReport := fmt.Sprintf("%d\t%s\t%s\t", nr.MaxCpuRatioLimit.Value, nr.MaxCpuRatioLimit.Namespace, nr.MaxCpuRatioLimit.PodName)
 
-	maxMemRatioTitle := fmt.Sprintf("%s\t%s\t%s\t", "Max CPU Ratio:", "Namespace:", "Pod name:")
+	maxMemRatioTitle := fmt.Sprintf("%s\t%s\t%s\t", "Max MEMORY Ratio:", "Namespace:", "Pod name:")
 	maxMemRatioReport := fmt.Sprintf("%d\t%s\t%s\t", nr.MaxMemRatioLimit.Value, nr.MaxMemRatioLimit.Namespace, nr.MaxMemRatioLimit.PodName)
 
 	NodeNameTitle := fmt.Sprintf("Node name: %s\n", nr.NodeName)
