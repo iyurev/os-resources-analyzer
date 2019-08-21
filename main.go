@@ -105,6 +105,12 @@ func (nr *nodeReport) PrettyPrint() {
 	SummoryNodeResourcesTitle := fmt.Sprintf("%s\t%s\t%s\t%s\t", "All requested CPU:", "All requested MEMORY", "All CPU Limits:", "All MEMORY Limits")
 	SummoryNodeResourceReport := fmt.Sprintf("%d Core\t%d Gi\t%d Core\t%d Gi\t", nr.SumCputRequests, nr.SumMemRequests, nr.SumCpuLimits, nr.SumMemLimits)
 
+	maxCpuRatioTitle := fmt.Sprintf("%s\t%s\t%s\t", "Max CPU Ratio:", "Namespace:", "Pod name:")
+	maxCpuRatioReport := fmt.Sprintf("%d\t%s\t%s\t", nr.MaxCpuRatioLimit.Value, nr.MaxCpuRatioLimit.Namespace, nr.MaxCpuRatioLimit.PodName)
+
+	maxMemRatioTitle := fmt.Sprintf("%s\t%s\t%s\t", "Max CPU Ratio:", "Namespace:", "Pod name:")
+	maxMemRatioReport := fmt.Sprintf("%d\t%s\t%s\t", nr.MaxMemRatioLimit.Value, nr.MaxMemRatioLimit.Namespace, nr.MaxMemRatioLimit.PodName)
+
 	NodeNameTitle := fmt.Sprintf("Node name: %s\n", nr.NodeName)
 	MaxCpuRequestReport := fmt.Sprintf("%d Cpu\t%s\t%s\t", nr.MaxCpuRequest.Value, nr.MaxCpuRequest.Namespace, nr.MaxCpuRequest.PodName)
 	MaxCpuLimitReport := fmt.Sprintf("%d Cpu\t%s\t%s\t", nr.MaxCpuLimit.Value, nr.MaxCpuLimit.Namespace, nr.MaxCpuLimit.PodName)
@@ -163,6 +169,25 @@ func (nr *nodeReport) PrettyPrint() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	_, err = redTitle.Fprintln(tw, maxCpuRatioTitle)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = yellowColorLine.Fprintln(tw, maxCpuRatioReport)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = redTitle.Fprintln(tw, maxMemRatioTitle)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = yellowColorLine.Fprintln(tw, maxMemRatioReport)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	err = tw.Flush()
 	if err != nil {
 		log.Fatal(err)
