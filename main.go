@@ -23,10 +23,14 @@ type maxResourceVal struct {
 }
 
 type clusterQuotaReport struct {
-	SumCpuRequests int64
-	SumCpuLimits   int64
-	SumMemRequests int64
-	SumMemLimits   int64
+	SumCpuRequests     int64
+	SumCpuLimits       int64
+	SumMemRequests     int64
+	SumMemLimits       int64
+	SumUsedCpuRequets  int64
+	SumUsedCpuLimits   int64
+	SumUsedMemRequests int64
+	SumUsedMemLimits   int64
 }
 
 func (cqr *clusterQuotaReport) ToHumanReadableVal() {
@@ -34,21 +38,37 @@ func (cqr *clusterQuotaReport) ToHumanReadableVal() {
 	cqr.SumCpuLimits = MilCoreToCore(cqr.SumCpuLimits)
 	cqr.SumMemRequests = BytesToGi(cqr.SumMemRequests)
 	cqr.SumMemLimits = BytesToGi(cqr.SumMemLimits)
+
+	cqr.SumUsedCpuRequets = MilCoreToCore(cqr.SumUsedCpuRequets)
+	cqr.SumUsedMemRequests = BytesToGi(cqr.SumUsedMemRequests)
+	cqr.SumUsedCpuLimits = MilCoreToCore(cqr.SumUsedCpuLimits)
+	cqr.SumUsedMemLimits = BytesToGi(cqr.SumUsedMemLimits)
 }
 
 func (cqr *clusterQuotaReport) PrettyPrint() {
 	cqr.ToHumanReadableVal()
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', tabwriter.AlignRight)
-	title := fmt.Sprintf("%s\t%s\t%s\t%s\t", "CLUSTER CPU REQUESTS:", "CLUSTER CPU LIMITS:", "CLUSTER MEMORY REQUESTS:", "CLUSTER MEMORY LIMITS:")
-	reportVal := fmt.Sprintf("%d core\t%d core\t%d Mi\t%d Mi\t", cqr.SumCpuRequests, cqr.SumCpuLimits, cqr.SumMemRequests, cqr.SumMemLimits)
+	titleHardSpec := fmt.Sprintf("%s\t%s\t%s\t%s\t", "ALLOCATED CPU REQUESTS:", "ALLOCATED CPU LIMITS:", "ALLOCATED MEMORY REQUESTS:", "ALLOCATED MEMORY LIMITS:")
+	titleStatusUsed := fmt.Sprintf("%s\t%s\t%s\t%s\t", "USED CPU REQUESTS:", "USED CPU LIMITS:", "USED MEMORY REQUESTS:", "USED MEMORY LIMITS:")
+	reportAllocatedQuota := fmt.Sprintf("%d core\t%d core\t%d Gi\t%d Gi\t", cqr.SumCpuRequests, cqr.SumCpuLimits, cqr.SumMemRequests, cqr.SumMemLimits)
+	reportUsedQuota := fmt.Sprintf("%d core\t%d core\t%d Gi\t%d Gi\t", cqr.SumUsedCpuRequets, cqr.SumUsedCpuLimits, cqr.SumUsedMemRequests, cqr.SumUsedMemLimits)
 	colorTitle := color.New(color.FgRed, color.Bold)
 	magColorLine := color.New(color.FgMagenta, color.Bold)
 
-	_, err := colorTitle.Fprintln(tw, title)
+	_, err := colorTitle.Fprintln(tw, titleHardSpec)
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = magColorLine.Fprintln(tw, reportVal)
+	_, err = magColorLine.Fprintln(tw, reportAllocatedQuota)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = colorTitle.Fprintln(tw, titleStatusUsed)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = magColorLine.Fprintln(tw, reportUsedQuota)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -198,10 +218,19 @@ func ClusterQuotaReport(clientset *kubernetes.Clientset) (*clusterQuotaReport, e
 			cpuLimits := quota.Spec.Hard["limits.cpu"]
 			memRequests := quota.Spec.Hard["requests.memory"]
 			memLimits := quota.Spec.Hard["limits.memory"]
+
+			usedCpuRequest := quota.Status.Used["requests.cpu"]
+			usedMemRequest := quota.Status.Used["requests.memory"]
+			usedCpuLimits := quota.Status.Used["limits.cpu"]
+			UsedMemLimits := quota.Status.Used["limits.memory"]
 			clusterReport.SumCpuRequests += cpuRequests.MilliValue()
 			clusterReport.SumCpuLimits += cpuLimits.MilliValue()
 			clusterReport.SumMemRequests += memRequests.Value()
 			clusterReport.SumMemLimits += memLimits.Value()
+			clusterReport.SumUsedCpuRequets += usedCpuRequest.MilliValue()
+			clusterReport.SumUsedMemRequests += usedMemRequest.Value()
+			clusterReport.SumUsedCpuLimits += usedCpuLimits.MilliValue()
+			clusterReport.SumUsedMemLimits += UsedMemLimits.Value()
 		}
 
 		return clusterReport, nil
