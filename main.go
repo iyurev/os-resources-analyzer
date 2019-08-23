@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/fatih/color"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -22,6 +23,78 @@ type maxResourceVal struct {
 	Namespace string
 }
 
+type maxResourceList struct {
+	CpuRequest maxResourceVal
+	CpuLimit   maxResourceVal
+	MemRequest maxResourceVal
+	MemLimit   maxResourceVal
+}
+
+func (mrl *maxResourceList) ToHumanReadableVal() {
+
+	mrl.CpuRequest.Value = MilCoreToCore(mrl.CpuRequest.Value)
+	mrl.CpuLimit.Value = MilCoreToCore(mrl.CpuLimit.Value)
+	mrl.MemRequest.Value = BytesToGi(mrl.MemRequest.Value)
+	mrl.MemLimit.Value = BytesToGi(mrl.MemLimit.Value)
+
+}
+func (mrl *maxResourceList) PrettyPrint() {
+	mrl.ToHumanReadableVal()
+	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', tabwriter.AlignRight)
+
+	MaxCpuRequestTitle := fmt.Sprintf("%s\t%s\t%s\t", "Max CPU request:", "Namespace:", "Pod name:")
+	MaxCpuLimittTitle := fmt.Sprintf("%s\t%s\t%s\t", "Max CPU limit:", "Namespace:", "Pod name:")
+	MaxMemRequestTitle := fmt.Sprintf("%s\t%s\t%s\t", "Max Memory request:", "Namespace:", "Pod name:")
+	MaxMemLimitTitle := fmt.Sprintf("%s\t%s\t%s\t", "Max Memory limit:", "Namespace:", "Pod name:")
+
+	MaxCpuRequestReport := fmt.Sprintf("%d Cpu\t%s\t%s\t", mrl.CpuRequest.Value, mrl.CpuRequest.Namespace, mrl.CpuRequest.PodName)
+	MaxCpuLimitReport := fmt.Sprintf("%d Cpu\t%s\t%s\t", mrl.CpuLimit.Value, mrl.CpuLimit.Namespace, mrl.CpuLimit.PodName)
+	MaxMemRequestReport := fmt.Sprintf("%d Gi\t%s\t%s\t", mrl.MemRequest.Value, mrl.MemRequest.Namespace, mrl.MemRequest.PodName)
+	MaxMemLimitReport := fmt.Sprintf("%d Gi\t%s\t%s\t", mrl.MemLimit.Value, mrl.MemLimit.Namespace, mrl.MemLimit.PodName)
+
+	colorTitle := color.New(color.FgBlue, color.Bold)
+	magColorLine := color.New(color.FgMagenta, color.Bold)
+
+	_, err := colorTitle.Fprintln(tw, MaxCpuRequestTitle)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = magColorLine.Fprintln(tw, MaxCpuRequestReport)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = colorTitle.Fprintln(tw, MaxCpuLimittTitle)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = magColorLine.Fprintln(tw, MaxCpuLimitReport)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = colorTitle.Fprintln(tw, MaxMemRequestTitle)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = magColorLine.Fprintln(tw, MaxMemRequestReport)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = colorTitle.Fprintln(tw, MaxMemLimitTitle)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = magColorLine.Fprintln(tw, MaxMemLimitReport)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = tw.Flush()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+}
+
 type clusterQuotaReport struct {
 	SumCpuRequests     int64
 	SumCpuLimits       int64
@@ -31,6 +104,7 @@ type clusterQuotaReport struct {
 	SumUsedCpuLimits   int64
 	SumUsedMemRequests int64
 	SumUsedMemLimits   int64
+	MaxRequestsReport  maxResourceList
 }
 
 func (cqr *clusterQuotaReport) ToHumanReadableVal() {
@@ -76,6 +150,7 @@ func (cqr *clusterQuotaReport) PrettyPrint() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	cqr.MaxRequestsReport.PrettyPrint()
 
 }
 
@@ -260,12 +335,22 @@ func ClusterQuotaReport(clientset *kubernetes.Clientset) (*clusterQuotaReport, e
 			clusterReport.SumUsedMemLimits += UsedMemLimits.Value()
 		}
 
+		allPods, err := GetPods(clientset, "", v1.ListOptions{})
+		if err != nil {
+			return clusterReport, err
+		}
+		resReqList, err := CalcMaxResourceRequests(allPods)
+		if err != nil {
+			return clusterReport, err
+		}
+		clusterReport.MaxRequestsReport = resReqList
 		return clusterReport, nil
 	}
+
 	return clusterReport, fmt.Errorf("Empty quota list!!\n")
 }
 
-func CreteNodeReport(clientset *kubernetes.Clientset, nodeName string) (nodeReport, error) {
+func CreateNodeReport(clientset *kubernetes.Clientset, nodeName string) (nodeReport, error) {
 	podList, err := clientset.CoreV1().Pods("").List(RunningPodFromNodeOpt(nodeName))
 	if err != nil {
 		return nodeReport{}, err
@@ -344,6 +429,51 @@ func init() {
 	flag.Parse()
 }
 
+func GetPods(clientset *kubernetes.Clientset, namespace string, opt v1.ListOptions) (*corev1.PodList, error) {
+	podList, err := clientset.CoreV1().Pods(namespace).List(opt)
+	if err != nil {
+		return &corev1.PodList{}, err
+	}
+	return podList, nil
+
+}
+
+func CalcMaxResourceRequests(podsList *corev1.PodList) (maxResourceList, error) {
+	maxResList := maxResourceList{}
+	if len(podsList.Items) == 0 {
+		return maxResList, fmt.Errorf("%\n", "Empty pods list!!")
+	}
+	for _, pod := range podsList.Items {
+		for _, container := range pod.Spec.Containers {
+			cpuRequest := container.Resources.Requests.Cpu().MilliValue()
+			cpuLimit := container.Resources.Limits.Cpu().MilliValue()
+			memRequest := container.Resources.Requests.Memory().Value()
+			memLimit := container.Resources.Limits.Memory().Value()
+
+			if cpuRequest > maxResList.CpuRequest.Value {
+				maxResList.CpuRequest.Value = cpuRequest
+				maxResList.CpuRequest.assignContext(&pod.ObjectMeta)
+			}
+			if cpuLimit > maxResList.CpuLimit.Value {
+				maxResList.CpuLimit.Value = cpuLimit
+				maxResList.CpuLimit.assignContext(&pod.ObjectMeta)
+			}
+			if memRequest > maxResList.MemRequest.Value {
+				maxResList.MemRequest.Value = cpuLimit
+				maxResList.MemRequest.assignContext(&pod.ObjectMeta)
+			}
+			if memLimit > maxResList.MemLimit.Value {
+				maxResList.MemLimit.Value = cpuLimit
+				maxResList.MemLimit.assignContext(&pod.ObjectMeta)
+			}
+
+		}
+
+	}
+
+	return maxResList, nil
+}
+
 func main() {
 	homePath := homedir.HomeDir()
 	kubeConfPath := filepath.Join(homePath, ".kube", defaultConfName)
@@ -356,9 +486,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	if nodeName != "" {
-		nodeReport, err := CreteNodeReport(client, nodeName)
+		nodeReport, err := CreateNodeReport(client, nodeName)
 		if err != nil {
 			log.Fatal(err)
 		}
